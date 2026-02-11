@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gradebox Monitoring System</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .point-label {
+            color: #ffff00;
+            font-weight: bold;
+            text-shadow:
+                -1px -1px 2px black,
+                 1px -1px 2px black,
+                -1px  1px 2px black,
+                 1px  1px 2px black;
+            font-size: 13px;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            pointer-events: none;
+        }
+        
+        .popup-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .popup-table th,
+        .popup-table td {
+            text-align: left;
+            padding: 4px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .popup-table th {
+            font-weight: bold;
+            white-space: nowrap;
+            padding-right: 15px;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Modal backdrop */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        /* Gradient backgrounds */
+        .gradient-blue {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .gradient-green {
+            background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);
+        }
+        
+        .gradient-orange {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        /* Sidebar transition */
+        .sidebar {
+            transition: margin-left 0.3s ease-in-out;
+        }
+        
+        .sidebar-hidden {
+            margin-left: -384px; /* -w-96 */
+        }
+        
+        /* Chart container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        /* Table styling */
+        .data-table {
+            font-size: 0.75rem;
+        }
+        
+        .data-table th {
+            position: sticky;
+            top: 0;
+            background-color: #1f2937;
+            z-index: 10;
+        }
+        
+        /* Chart hover effect */
+        .chart-clickable {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .chart-clickable:hover {
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Login Page -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+            <div class="text-center mb-8">
+                <i class="fas fa-map-marked-alt text-6xl text-blue-600 mb-4"></i>
+                <h1 class="text-3xl font-bold text-gray-800">Gradebox Monitoring</h1>
+                <p class="text-gray-600 mt-2">Sistem Monitoring Inspeksi Lapangan</p>
+            </div>
+            
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-user text-gray-400"></i>
+                        </div>
+                        <input type="text" id="username" 
+                            class="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="Masukkan username" required>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input type="password" id="password" 
+                            class="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="Masukkan password" required>
+                    </div>
+                </div>
+                
+                <div id="login-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span id="login-error-message">Username atau password salah</span>
+                </div>
+                
+                <button type="submit" 
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 transform hover:scale-105">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center text-sm text-gray-600">
+                <p>Demo credentials:</p>
+                <p class="mt-1"><strong>admin</strong> / admin123</p>
+                <p><strong>user</strong> / user123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="app" class="hidden h-screen flex flex-col">
+        <!-- Top Navigation -->
+        <nav class="bg-white shadow-lg h-16 flex-shrink-0 z-50">
+            <div class="h-full px-4 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-map-marked-alt text-2xl text-blue-600"></i>
+                    <h1 class="text-xl font-bold text-gray-800">Gradebox Monitoring</h1>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <!-- Navigation Menu -->
+                    <button id="nav-map" class="nav-btn px-4 py-2 rounded-lg font-medium transition duration-200 bg-blue-600 text-white">
+                        <i class="fas fa-map mr-2"></i>Map
+                    </button>
+                    <button id="nav-dashboard" class="nav-btn px-4 py-2 rounded-lg font-medium transition duration-200 text-gray-700 hover:bg-gray-100">
+                        <i class="fas fa-chart-bar mr-2"></i>Dashboard
+                    </button>
+                    <button id="toggle-sidebar-btn" class="px-4 py-2 rounded-lg font-medium transition duration-200 bg-gray-200 text-gray-700 hover:bg-gray-300">
+                        <i class="fas fa-bars mr-2"></i><span class="hidden sm:inline">Sidebar</span>
+                    </button>
+                    <button id="nav-help" class="nav-btn px-4 py-2 rounded-lg font-medium transition duration-200 text-gray-700 hover:bg-gray-100">
+                        <i class="fas fa-question-circle mr-2"></i><span class="hidden sm:inline">Help</span>
+                    </button>
+                    
+                    <!-- User Menu -->
+                    <div class="border-l pl-4 ml-4 flex items-center space-x-3">
+                        <div class="text-right hidden md:block">
+                            <p class="text-sm font-medium text-gray-800" id="user-name">User</p>
+                            <p class="text-xs text-gray-500" id="user-role">Role</p>
+                        </div>
+                        <button id="logout-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200">
+                            <i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline ml-2">Logout</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Layout: Sidebar + Content -->
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Sidebar -->
+            <div id="sidebar" class="sidebar w-96 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+                <!-- Filter Section -->
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-filter text-blue-600 mr-2"></i>Filter Data
+                    </h2>
+                    
+                    <form id="filter-form" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <i class="fas fa-calendar mr-1"></i>Tanggal
+                            </label>
+                            <input type="date" id="filter-date" 
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <i class="fas fa-users mr-1"></i>Mitra Kerja
+                            </label>
+                            <select id="filter-mitra" 
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                                <option value="SIS">SIS</option>
+                                <option value="BUMA">BUMA</option>
+                                <option value="PPA">PPA</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <i class="fas fa-cubes mr-1"></i>Material
+                            </label>
+                            <select id="filter-material" 
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                                <option value="OB">OB</option>
+                                <option value="COAL">COAL</option>
+                                <option value="TOP_SOIL">TOP SOIL</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex space-x-2 pt-2">
+                            <button type="submit" 
+                                class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition duration-200 text-sm">
+                                <i class="fas fa-search mr-2"></i>Submit
+                            </button>
+                            <button type="button" id="reset-filter-btn" 
+                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-200">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="filter-info" class="mt-3 p-3 bg-blue-50 rounded-lg hidden">
+                        <p class="text-xs text-blue-800 font-medium">
+                            <i class="fas fa-info-circle mr-1"></i>Records: <span id="data-count">0</span>
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Data Table Section (Only for Map View) -->
+                <div id="sidebar-table-section" class="flex-1 overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-gray-800">
+                            <i class="fas fa-table text-blue-600 mr-2"></i><span id="sidebar-table-title">Data Table</span>
+                        </h3>
+                        <button id="sidebar-export-csv-btn" class="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition">
+                            <i class="fas fa-file-csv mr-1"></i>CSV
+                        </button>
+                    </div>
+                    <div id="sidebar-table-container" class="flex-1 overflow-auto p-4">
+                        <div class="text-center py-8 text-gray-400">
+                            <i class="fas fa-table text-4xl mb-2 opacity-30"></i>
+                            <p class="text-xs">Submit filter to load data</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div id="main-content" class="flex-1 overflow-hidden">
+                <!-- Map View -->
+                <div id="map-view" class="h-full">
+                    <div id="map" class="h-full w-full"></div>
+                </div>
+
+                <!-- Dashboard View -->
+                <div id="dashboard-view" class="hidden h-full overflow-auto p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                        <i class="fas fa-chart-bar text-blue-600 mr-2"></i>Dashboard Analytics
+                    </h2>
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="gradient-blue text-white p-4 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs opacity-90">Total Records</p>
+                                    <p class="text-3xl font-bold mt-1" id="stats-total">0</p>
+                                </div>
+                                <i class="fas fa-database text-4xl opacity-30"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="gradient-green text-white p-4 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs opacity-90">Loading Points</p>
+                                    <p class="text-3xl font-bold mt-1" id="stats-loading">0</p>
+                                </div>
+                                <i class="fas fa-arrow-up text-4xl opacity-30"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="gradient-orange text-white p-4 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs opacity-90">Dumping Points</p>
+                                    <p class="text-3xl font-bold mt-1" id="stats-dumping">0</p>
+                                </div>
+                                <i class="fas fa-arrow-down text-4xl opacity-30"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Charts -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-xl shadow-lg chart-clickable" id="chart-front-container">
+                            <h3 class="text-sm font-semibold text-gray-800 mb-3">Distribution by Front Type (Click bar to filter)</h3>
+                            <div class="chart-container">
+                                <canvas id="frontTypeChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-xl shadow-lg chart-clickable" id="chart-material-container">
+                            <h3 class="text-sm font-semibold text-gray-800 mb-3">Distribution by Material (Click bar to filter)</h3>
+                            <div class="chart-container">
+                                <canvas id="materialChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dashboard Data Table -->
+                    <div class="bg-white rounded-xl shadow-lg p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">
+                                <i class="fas fa-table text-blue-600 mr-2"></i><span id="dashboard-table-title">Data Table - All Data</span>
+                            </h3>
+                            <button id="dashboard-export-csv-btn" class="text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                                <i class="fas fa-file-csv mr-2"></i>Export CSV
+                            </button>
+                        </div>
+                        <div id="dashboard-table-container" class="overflow-auto max-h-96">
+                            <div class="text-center py-8 text-gray-400">
+                                <i class="fas fa-table text-4xl mb-2 opacity-30"></i>
+                                <p class="text-sm">Submit filter to load data</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help View -->
+                <div id="help-view" class="hidden h-full overflow-auto p-6">
+                    <div class="max-w-4xl mx-auto">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                            <i class="fas fa-question-circle text-blue-600 mr-2"></i>Help & User Guide
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-3">🗺️ Map View Workflow</h3>
+                                <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                                    <li>Login to the application</li>
+                                    <li>Map view will be displayed by default</li>
+                                    <li>Click "Sidebar" button to show sidebar (if hidden)</li>
+                                    <li>Fill filter form (defaults: SIS, OB, Today)</li>
+                                    <li>Click "Submit" button to fetch data</li>
+                                    <li>Data table appears in sidebar below filter</li>
+                                    <li>Points are displayed on the map</li>
+                                    <li>Click marker on map to view details popup</li>
+                                    <li>Click row in data table to zoom to location</li>
+                                </ol>
+                            </div>
+                            
+                            <div class="bg-white p-6 rounded-xl shadow">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-3">📊 Dashboard Workflow</h3>
+                                <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                                    <li>Click "Dashboard" menu to switch to dashboard view</li>
+                                    <li>Click "Sidebar" button to show sidebar (if hidden)</li>
+                                    <li>Fill filter form (defaults: SIS, OB, Today)</li>
+                                    <li>Click "Submit" button</li>
+                                    <li>Charts are displayed in main view</li>
+                                    <li>Data table shows below charts with all filtered data</li>
+                                    <li>Click on chart bars to filter data table</li>
+                                    <li>Data table will show only selected category records</li>
+                                    <li>Table title updates to show current filter</li>
+                                </ol>
+                            </div>
+                            
+                            <div class="bg-white p-6 rounded-xl shadow">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-3">🔍 Filter Default Values</h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Date:</strong> Today's date (auto-populated)</li>
+                                    <li><strong>Mitra Kerja:</strong> SIS (default selection)</li>
+                                    <li><strong>Material:</strong> OB (default selection)</li>
+                                    <li><strong>Reset Button:</strong> Restores all defaults</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-white p-6 rounded-xl shadow">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-3">💡 Features & Tips</h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>• <strong>Sidebar Toggle:</strong> Show/hide sidebar for better view</li>
+                                    <li>• <strong>Export CSV:</strong> Download current table data</li>
+                                    <li>• <strong>Interactive Charts:</strong> Click bars to filter table</li>
+                                    <li>• <strong>Map Markers:</strong> Color-coded by Front Type</li>
+                                    <li>• <strong>Dashboard Table:</strong> Shows in main view below charts</li>
+                                    <li>• <strong>Map Table:</strong> Shows in sidebar for quick reference</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loading-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center modal-backdrop">
+        <div class="bg-white rounded-xl shadow-2xl p-8 text-center">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-gray-700 font-medium" id="loading-message">Loading data...</p>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="fixed top-20 right-4 z-[9999] hidden transform transition-all duration-300">
+        <div id="toast-content" class="bg-white rounded-lg shadow-xl p-4 min-w-[300px]">
+            <div class="flex items-center">
+                <i id="toast-icon" class="fas fa-check-circle text-2xl mr-3"></i>
+                <div class="flex-1">
+                    <p id="toast-title" class="font-semibold text-gray-800">Success</p>
+                    <p id="toast-message" class="text-sm text-gray-600">Operation completed successfully</p>
+                </div>
+                <button id="close-toast" class="ml-4 text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Main Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
