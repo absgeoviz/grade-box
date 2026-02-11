@@ -167,9 +167,9 @@ function initializeMap() {
     osmLayer.addTo(map);
     
     const baseLayers = {
-        "Street Map": osmLayer,
         "Satellite": satelliteLayer,
-        "Topographic": topoLayer
+        "Topographic": topoLayer,
+        "Street Map": osmLayer,
     };
     
     L.control.layers(baseLayers).addTo(map);
